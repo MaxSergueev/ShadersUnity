@@ -8,7 +8,12 @@ Shader "Custom/Water"
         _Speed("Speed", float) = 1.0
         _Frequency("Frequency", float) = 1.0
         _Amplitude("Wave height", float) = 0.1
-
+        _TextureInfluence("Texture Influence", Range(0, 1)) = 0.2
+        _NoiseAnimSpeed("Noise Animation Speed", float) = 1.0
+        _NoiseAnimHeight("Noise Animation Height", Range(0, 1)) = 0.5
+        _HeightRangeAdjust("Height Range Adjustment", Range(0.5, 2.0)) = 1.0
+        _SpatialFreq("Spatial Frequency", float) = 2.0
+        _AnimVariation("Animation Variation", Range(0, 1)) = 0.5
     }
 
     SubShader
@@ -38,6 +43,12 @@ Shader "Custom/Water"
             uniform float _Speed;
             uniform float _Frequency;
             uniform float _Amplitude;
+            uniform float _TextureInfluence;
+            uniform float _NoiseAnimSpeed;
+            uniform float _NoiseAnimHeight;
+            uniform float _HeightRangeAdjust;
+            uniform float _SpatialFreq;
+            uniform float _AnimVariation;
 
             struct appdata
             {
@@ -50,6 +61,10 @@ Shader "Custom/Water"
             {
                 float4 vertex : SV_POSITION;
                 float4 texcoord: TEXCOORD0;
+                float displacement : TEXCOORD2;
+                float finalLocalPosY : TEXCOORD1;      
+                float originalLocalPosY : TEXCOORD3;   
+                float waveAmplitude : TEXCOORD4;       
             };
 
             float4 _Color;
@@ -58,23 +73,63 @@ Shader "Custom/Water"
             {
                 v2f o;
                 
-                v.texcoord.x =  (v.texcoord.x + (_Time.y * -0.15 *_Speed) *_Frequency * _Amplitude);
-                v.vertex.y = v.vertex.y + sin((v.texcoord.x - _Time.y * _Speed) *_Frequency) * _Amplitude;
+                float originalY = v.vertex.y;
+                
+                // Animate texture coordinates for horizontal scrolling
+                v.texcoord.x = (v.texcoord.x + (_Time.y * -0.15 *_Speed) *_Frequency * _Amplitude);
+                
+                // Main sine wave animation
+                float waveDisplacement = sin((v.texcoord.x - _Time.y * _Speed) *_Frequency) * _Amplitude;
+                v.vertex.y = v.vertex.y + waveDisplacement;
                 
                 float displacement = tex2Dlod(_MainTex, v.texcoord * _MainTex_ST);
-                o.vertex = UnityObjectToClipPos(v.vertex + (v.normal * displacement * _Amplitude));
-
+                
+                // Create spatial variation so different parts of water animate differently
+                float2 spatialCoord = float2(v.vertex.x, v.vertex.z) * _SpatialFreq;
+                float timeOffset = sin(spatialCoord.x) * cos(spatialCoord.y) * _AnimVariation * 3.14159;
+                
+                // Animate noise displacement up and down with spatial variation
+                float noiseAnimFactor = sin((_Time.y * _NoiseAnimSpeed) + timeOffset);
+                float animatedDisplacement = displacement;
+                animatedDisplacement += displacement * noiseAnimFactor * _NoiseAnimHeight;
+                
+                o.displacement = animatedDisplacement;
+                
+                // Track final position for height-based coloring
+                float finalLocalY = originalY + waveDisplacement + (animatedDisplacement * _Amplitude);
+                
+                o.vertex = UnityObjectToClipPos(v.vertex + (v.normal * animatedDisplacement * _Amplitude));
                 o.texcoord.xy = (v.texcoord.xy * _MainTex_ST.xy + _MainTex_ST.zw);
+                
+                o.finalLocalPosY = finalLocalY;
+                o.originalLocalPosY = originalY;
+                o.waveAmplitude = _Amplitude * _HeightRangeAdjust;
 
                 return o;
             }
 
             half4 frag (v2f i) : COLOR
             {
-                float4 color = tex2D(_MainTex, i.texcoord);
-                return i.vertex.y * _Color1 + (0.025-i.vertex.y) * _Color2; //color.r * _Color1 + (1 - color.r) * _Color2;
+                // Calculate dynamic height range for coloring
+                float minHeight = i.originalLocalPosY - i.waveAmplitude;
+                float maxHeight = i.originalLocalPosY + i.waveAmplitude;
+                
+                // Create gradient based on current height within range
+                float heightGradient = saturate((i.finalLocalPosY - minHeight) / (maxHeight - minHeight));
+                
+                // Texture influence to gradient
+                float modifiedGradient = heightGradient + (i.displacement - 0.5) * _TextureInfluence;
+                modifiedGradient = saturate(modifiedGradient);
+                
+                return lerp(_Color2, _Color1, modifiedGradient);
             }
             ENDCG
         }
     }
 }
+
+
+
+
+
+

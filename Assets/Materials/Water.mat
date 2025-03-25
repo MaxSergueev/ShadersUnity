@@ -61,29 +61,47 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Amplitude: 0.5
+    - _Amplitude: 0.35
+    - _AnimVariation: 0.5
     - _BumpScale: 1
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _Frequency: 6
+    - _Frequency: 4.44
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
+    - _HeightRangeAdjust: 2
+    - _MaxHeight: 4.42
     - _Metallic: 0
+    - _MinHeight: -2.9
     - _Mode: 0
+    - _NoiseAnimHeight: 0.382
+    - _NoiseAnimSpeed: 1.24
+    - _NoiseIntensity: 0
+    - _NoiseSpeed: 1.87
+    - _NoiseWaveFreq: 2
+    - _NoiseWaveSpeed: 1.5
     - _OcclusionStrength: 1
     - _Parallax: 0.02
     - _SmoothnessTextureChannel: 0
+    - _SpatialFreq: 2
+    - _SpatialFrequency: 2
     - _SpecularHighlights: 1
     - _Speed: 0.5
     - _SrcBlend: 1
+    - _TextureInfluence: 0.067
     - _UVSec: 0
+    - _VerticalScale: 0.2
+    - _VerticalSpeed: 0.2
+    - _WaveAmplitude: 0.3
+    - _WaveFrequency: 1.36
     - _WaveHeight: 0.07
+    - _WaveSpeed: 1.32
     - _ZWrite: 1
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _Color1: {r: 0.490196, g: 0.90588236, b: 0.87683815, a: 1}
-    - _Color2: {r: 0.46070665, g: 0.63288504, b: 0.8207547, a: 1}
+    - _Color1: {r: 1, g: 1, b: 1, a: 1}
+    - _Color2: {r: 0.22677112, g: 0.36995047, b: 0.9811321, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
