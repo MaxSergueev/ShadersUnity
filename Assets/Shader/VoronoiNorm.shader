@@ -58,6 +58,7 @@ Shader "Custom/VoronoiNorm"
             {
                 v2f o;
                 float displacement = tex2Dlod(_MainTex, v.texcoord * _MainTex_ST);
+                
                 o.vertex = UnityObjectToClipPos(v.vertex + (v.normal * displacement*_Amplitude));
                 //o.vertex.y = v.vertex.y + sin( (v.texcoord.x - _Time.y * _Speed) *_Frequency) * _Amplitude;
 
