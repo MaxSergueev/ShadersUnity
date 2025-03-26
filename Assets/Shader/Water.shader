@@ -1,4 +1,4 @@
-Shader "Custom/Water"
+Shader "Custom/Outline"
 {
     Properties
     {
@@ -84,14 +84,14 @@ Shader "Custom/Water"
                 
                 float displacement = tex2Dlod(_MainTex, v.texcoord * _MainTex_ST);
                 
-                // Create spatial variation so different parts of water animate differently
+                // Create spatial variation so wavelets are less uniform
                 float2 spatialCoord = float2(v.vertex.x, v.vertex.z) * _SpatialFreq;
-                float timeOffset = sin(spatialCoord.x) * cos(spatialCoord.y) * _AnimVariation * 3.14159;
+                float timeOffset = sin(spatialCoord.x) * cos(spatialCoord.y) * _AnimVariation * 3.14159; ///Here
                 
                 // Animate noise displacement up and down with spatial variation
-                float noiseAnimFactor = sin((_Time.y * _NoiseAnimSpeed) + timeOffset);
+                float noiseAnimFactor = clamp(sin((_Time.y * _NoiseAnimSpeed)), 0.1, 1) + timeOffset; 
                 float animatedDisplacement = displacement;
-                animatedDisplacement += displacement * noiseAnimFactor * _NoiseAnimHeight;
+                animatedDisplacement = animatedDisplacement + displacement * noiseAnimFactor * _NoiseAnimHeight;
                 
                 o.displacement = animatedDisplacement;
                 
