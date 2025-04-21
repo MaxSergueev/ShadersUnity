@@ -1,0 +1,169 @@
+#pragma kernel UpdateAgents
+#pragma kernel DiffuseTrails
+#pragma kernel RenderTrails
+
+// Parameters
+int Width;
+int Height;
+float MoveSpeed;
+float TurnSpeed;
+float SensorAngle;
+float SensorDistance;
+float DepositAmount;
+float DecayFactor;
+float DiffuseFactor;
+float DeltaTime;
+float ColorIntensity;
+float4 BackgroundColor;
+
+// Agent struct
+struct Agent
+{
+    float2 position;
+    float angle;
+};
+
+// Buffers and textures
+RWStructuredBuffer<Agent> Agents;
+RWTexture2D<float4> TrailMap;
+RWStructuredBuffer<float4> ColorGradient;
+
+// Random number generation
+uint wang_hash(uint seed)
+{
+    seed = (seed ^ 61) ^ (seed >> 16);
+    seed *= 9;
+    seed = seed ^ (seed >> 4);
+    seed *= 0x27d4eb2d;
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+
+float random(inout uint state)
+{
+    state = wang_hash(state);
+    return state / 4294967295.0;
+}
+
+// Wrap coordinates to the texture boundaries
+float2 wrap(float2 pos)
+{
+    return float2(
+        (pos.x + Width) % Width,
+        (pos.y + Height) % Height
+    );
+}
+
+// Sensor sampling
+float sense(Agent agent, float angleOffset)
+{
+    float sensorAngle = agent.angle + angleOffset;
+    float2 sensorDir = float2(cos(sensorAngle), sin(sensorAngle));
+    float2 sensorPos = wrap(agent.position + sensorDir * SensorDistance);
+    
+    int sensorX = (int) sensorPos.x;
+    int sensorY = (int) sensorPos.y;
+    
+    // Sample trail value
+    return TrailMap[int2(sensorX, sensorY)].r;
+}
+
+[numthreads(64, 1, 1)]
+void UpdateAgents(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= 0)
+    {
+        // Get current agent
+        Agent agent = Agents[id.x];
+        
+        // Sensing phase
+        float sensorForward = sense(agent, 0);
+        float sensorLeft = sense(agent, SensorAngle);
+        float sensorRight = sense(agent, -SensorAngle);
+        
+        // Calculate rotation based on sensor readings
+        float turn = 0;
+        uint state = id.x + (uint) (agent.position.x * 100 + agent.position.y * 100000);
+        
+        if (sensorForward < sensorLeft && sensorForward < sensorRight)
+        {
+            // Random turn if forward is weakest
+            turn = (random(state) * 2 - 1) * TurnSpeed * DeltaTime;
+        }
+        else if (sensorLeft < sensorRight)
+        {
+            // Turn right if right sensor has more pheromone
+            turn = -TurnSpeed * DeltaTime;
+        }
+        else if (sensorRight < sensorLeft)
+        {
+            // Turn left if left sensor has more pheromone
+            turn = TurnSpeed * DeltaTime;
+        }
+        
+        // Update angle
+        agent.angle += turn;
+        
+        // Move agent
+        float2 moveDirection = float2(cos(agent.angle), sin(agent.angle));
+        agent.position = wrap(agent.position + moveDirection * MoveSpeed * DeltaTime);
+        
+        // Deposit pheromone trail
+        int posX = (int) agent.position.x;
+        int posY = (int) agent.position.y;
+        float4 currentValue = TrailMap[int2(posX, posY)];
+        TrailMap[int2(posX, posY)] = float4(currentValue.r + DepositAmount * DeltaTime, 0, 0, 1);
+        
+        // Update agent in buffer
+        Agents[id.x] = agent;
+    }
+}
+
+[numthreads(8, 8, 1)]
+void DiffuseTrails(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < (uint) Width && id.y < (uint) Height)
+    {
+        int x = id.x;
+        int y = id.y;
+        
+        // Get current and neighbor cells
+        float4 current = TrailMap[int2(x, y)];
+        
+        float4 left = TrailMap[int2((x - 1 + Width) % Width, y)];
+        float4 right = TrailMap[int2((x + 1) % Width, y)];
+        float4 up = TrailMap[int2(x, (y - 1 + Height) % Height)];
+        float4 down = TrailMap[int2(x, (y + 1) % Height)];
+        
+        // Average for diffusion
+        float4 average = (left + right + up + down) / 4.0;
+        
+        // Apply diffusion and decay
+        float4 diffused = lerp(current, average, DiffuseFactor);
+        float4 result = diffused * DecayFactor;
+        
+        // Update trail map
+        TrailMap[int2(x, y)] = result;
+    }
+}
+
+[numthreads(8, 8, 1)]
+void RenderTrails(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < (uint) Width && id.y < (uint) Height)
+    {
+        // Get trail value
+        float trailValue = TrailMap[int2(id.x, id.y)].r;
+        
+        // Map to gradient color
+        trailValue = saturate(trailValue * ColorIntensity);
+        int colorIndex = (int) (trailValue * 255);
+        float4 gradientColor = ColorGradient[colorIndex];
+        
+        // Mix with background color based on trail intensity
+        float4 finalColor = lerp(BackgroundColor, gradientColor, trailValue);
+        
+        // Update the texture
+        TrailMap[int2(id.x, id.y)] = finalColor;
+    }
+}
